@@ -130,13 +130,66 @@ export function OmrScanner({ activeExam }) {
 
   const handleSaveResult = () => {
     if (!lastResult) return;
-    saveResult({
+    const saved = saveResult({
       ...lastResult,
       examId: activeExam.id,
-      examTitle: activeExam.title
+      examTitle: activeExam.title,
+      institution: activeExam.institution
     });
-    setSavedNotification(true);
-    setTimeout(() => setSavedNotification(false), 3000);
+
+    if (saved) {
+      setSavedNotification(true);
+      if (lastResult.percentage >= 70) {
+        confetti({
+          particleCount: 80,
+          spread: 70,
+          origin: { y: 0.6 }
+        });
+      }
+      setTimeout(() => setSavedNotification(false), 3000);
+    }
+  };
+
+  const handleManualOverride = (qNum, newAnswer) => {
+    if (!lastResult) return;
+
+    const newDetails = lastResult.details.map(item => {
+      if (item.question === qNum) {
+        const isCorrect = newAnswer === item.correct;
+        return { ...item, detected: newAnswer, isCorrect };
+      }
+      return item;
+    });
+
+    const newAnswers = { ...lastResult.answers, [qNum]: newAnswer };
+    let correctCount = 0;
+    let incorrectCount = 0;
+    let blankCount = 0;
+    let doubleMarkCount = 0;
+
+    newDetails.forEach(d => {
+      if (d.isCorrect) correctCount++;
+      else if (d.detected === 'BLANK') blankCount++;
+      else if (d.detected === 'MULTIPLE') doubleMarkCount++;
+      else incorrectCount++;
+    });
+
+    const correctPts = activeExam.scoringRules?.correctPoints ?? 1;
+    const totalPossible = lastResult.totalQuestions * correctPts;
+    const rawScore = Math.max(0, correctCount * correctPts);
+    const percentage = Math.round((rawScore / totalPossible) * 100);
+
+    setLastResult(prev => ({
+      ...prev,
+      answers: newAnswers,
+      details: newDetails,
+      correctCount,
+      incorrectCount,
+      blankCount,
+      doubleMarkCount,
+      score: rawScore,
+      percentage
+    }));
   };
 
   return (
@@ -315,7 +368,10 @@ export function OmrScanner({ activeExam }) {
 
               {/* Questions Breakdown List */}
               <div className="questions-breakdown">
-                <h4>Desglose por Pregunta ({lastResult.totalQuestions})</h4>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+                  <h4>Desglose y Corrección Manual ({lastResult.totalQuestions})</h4>
+                  <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Selecciona para corregir</span>
+                </div>
                 <div className="breakdown-list">
                   {lastResult.details.map(item => (
                     <div
@@ -323,7 +379,29 @@ export function OmrScanner({ activeExam }) {
                       className={`breakdown-chip ${item.isCorrect ? 'correct' : item.detected === 'BLANK' ? 'blank' : 'incorrect'}`}
                     >
                       <span className="chip-q">P{item.question}.</span>
-                      <span className="chip-ans">{item.detected}</span>
+                      <select
+                        value={item.detected}
+                        onChange={(e) => handleManualOverride(item.question, e.target.value)}
+                        style={{
+                          background: 'transparent',
+                          color: 'inherit',
+                          border: 'none',
+                          fontWeight: 800,
+                          fontSize: '0.85rem',
+                          cursor: 'pointer',
+                          outline: 'none',
+                          padding: '0 2px'
+                        }}
+                        title="Haz clic para corregir manualmente esta respuesta"
+                      >
+                        <option value="A" style={{ color: '#000' }}>A</option>
+                        <option value="B" style={{ color: '#000' }}>B</option>
+                        <option value="C" style={{ color: '#000' }}>C</option>
+                        <option value="D" style={{ color: '#000' }}>D</option>
+                        {activeExam.optionsPerQuestion >= 5 && <option value="E" style={{ color: '#000' }}>E</option>}
+                        <option value="BLANK" style={{ color: '#000' }}>BLANK</option>
+                        <option value="MULTIPLE" style={{ color: '#000' }}>MULTIPLE</option>
+                      </select>
                       {item.isCorrect ? <CheckCircle2 size={12} /> : <span className="correct-hint">(Clave: {item.correct})</span>}
                     </div>
                   ))}

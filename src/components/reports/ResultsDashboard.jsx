@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { BarChart3, Download, Trash2, Users, Award, TrendingUp, AlertCircle, RefreshCw } from 'lucide-react';
+import { BarChart3, Download, Trash2, Users, Award, TrendingUp, AlertCircle, RefreshCw, FileText } from 'lucide-react';
 import { getResults, clearResults } from '../../utils/storage';
+import { downloadStudentReportPDF } from '../../utils/pdfGenerator';
 
 export function ResultsDashboard({ activeExam }) {
   const [resultsList, setResultsList] = useState([]);
@@ -142,6 +143,7 @@ export function ResultsDashboard({ activeExam }) {
                     <th>En Blanco</th>
                     <th>Nota</th>
                     <th>Fecha</th>
+                    <th>Acciones</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -157,6 +159,15 @@ export function ResultsDashboard({ activeExam }) {
                         </span>
                       </td>
                       <td className="text-secondary">{new Date(item.scannedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</td>
+                      <td>
+                        <button
+                          className="btn btn-secondary btn-sm"
+                          onClick={() => downloadStudentReportPDF(item, activeExam)}
+                          title="Descargar boletín de resultados individual en PDF"
+                        >
+                          <FileText size={14} /> Boletín PDF
+                        </button>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
