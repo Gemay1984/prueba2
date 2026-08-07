@@ -13,6 +13,7 @@ export function OmrScanner({ activeExam }) {
   const [savedNotification, setSavedNotification] = useState(false);
   const [darknessThreshold, setDarknessThreshold] = useState(0.35); // Sensitivity slider
   const [viewAnnotated, setViewAnnotated] = useState(true); // Toggle annotated sheet view (rbaron/omr style)
+  const [isFullscreen, setIsFullscreen] = useState(false); // Fullscreen camera mode for mobile
 
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
@@ -41,8 +42,8 @@ export function OmrScanner({ activeExam }) {
       const constraints = {
         video: {
           facingMode: { ideal: 'environment' },
-          width: { ideal: 1920 },
-          height: { ideal: 1080 }
+          width: { ideal: 2592 },
+          height: { ideal: 1944 }
         }
       };
       const stream = await navigator.mediaDevices.getUserMedia(constraints);
@@ -247,38 +248,77 @@ export function OmrScanner({ activeExam }) {
               <img src={lastResult.annotatedCanvasDataUrl} alt="Hoja OMR Anotada" className="annotated-sheet-img" />
             </div>
           ) : activeTab === 'camera' ? (
-            <div className="viewfinder-wrapper">
-              <video ref={videoRef} className="video-feed" playsInline muted></video>
-              <div className="viewfinder-overlay">
-                <div className="corner-target top-left"></div>
-                <div className="corner-target top-right"></div>
-                <div className="corner-target bottom-left"></div>
-                <div className="corner-target bottom-right"></div>
-                <div className="overlay-guide-text">
-                  Alinea las 4 esquinas de la hoja en el recuadro
+            <>
+              <div className="viewfinder-wrapper">
+                <video ref={videoRef} className="video-feed" playsInline muted></video>
+                <div className="viewfinder-overlay">
+                  <div className="corner-target top-left"></div>
+                  <div className="corner-target top-right"></div>
+                  <div className="corner-target bottom-left"></div>
+                  <div className="corner-target bottom-right"></div>
+                  <div className="overlay-guide-text">
+                    Alinea las 4 esquinas de la hoja
+                  </div>
                 </div>
-              </div>
 
-              {/* Floating Action Button inside camera view */}
-              <div className="floating-scan-btn-box">
+                {/* Floating Action Button inside camera view */}
+                <div className="floating-scan-btn-box">
+                  <button
+                    className="btn btn-success btn-floating-scan"
+                    onClick={handleCaptureAndGrade}
+                    disabled={isProcessing}
+                  >
+                    {isProcessing ? <RefreshCw className="spin" size={18} /> : <Eye size={18} />}
+                    {isProcessing ? 'Procesando...' : '📸 CALIFICAR'}
+                  </button>
+                </div>
+
+                {/* Fullscreen toggle button */}
                 <button
-                  className="btn btn-success btn-floating-scan"
-                  onClick={handleCaptureAndGrade}
-                  disabled={isProcessing}
+                  className="btn-fullscreen-toggle"
+                  onClick={() => setIsFullscreen(true)}
+                  title="Abrir cámara en pantalla completa"
                 >
-                  {isProcessing ? <RefreshCw className="spin" size={18} /> : <Eye size={18} />}
-                  {isProcessing ? 'Procesando Visión OMR...' : '📸 CALIFICAR HOJA AHORA'}
+                  ⛶ Pantalla Completa
                 </button>
+
+                {cameraError && (
+                  <div className="camera-error-overlay">
+                    <AlertTriangle size={36} color="var(--accent-warning)" />
+                    <p>{cameraError}</p>
+                    <button className="btn btn-secondary" onClick={startCamera}>Reintentar Cámara</button>
+                  </div>
+                )}
               </div>
 
-              {cameraError && (
-                <div className="camera-error-overlay">
-                  <AlertTriangle size={36} color="var(--accent-warning)" />
-                  <p>{cameraError}</p>
-                  <button className="btn btn-secondary" onClick={startCamera}>Reintentar Cámara</button>
+              {/* FULLSCREEN CAMERA MODE */}
+              {isFullscreen && (
+                <div className="fullscreen-camera-overlay">
+                  <video ref={videoRef} className="fullscreen-video-feed" playsInline muted autoPlay></video>
+                  <div className="fullscreen-guide-frame">
+                    <div className="corner-target top-left"></div>
+                    <div className="corner-target top-right"></div>
+                    <div className="corner-target bottom-left"></div>
+                    <div className="corner-target bottom-right"></div>
+                  </div>
+                  <div className="fullscreen-top-bar">
+                    <button className="btn-fullscreen-close" onClick={() => setIsFullscreen(false)}>
+                      ✕ Salir
+                    </button>
+                    <span className="fullscreen-hint">Enfoca toda la hoja de respuestas</span>
+                  </div>
+                  <div className="fullscreen-bottom-bar">
+                    <button
+                      className="btn-fullscreen-capture"
+                      onClick={() => { handleCaptureAndGrade(); setIsFullscreen(false); }}
+                      disabled={isProcessing}
+                    >
+                      {isProcessing ? '⏳ Procesando...' : '📸 CAPTURAR Y CALIFICAR'}
+                    </button>
+                  </div>
                 </div>
               )}
-            </div>
+            </>
           ) : (
             <div className="upload-dropzone" onClick={() => fileInputRef.current?.click()}>
               <Upload size={48} className="upload-icon" />
@@ -539,11 +579,127 @@ export function OmrScanner({ activeExam }) {
         .viewfinder-wrapper {
           position: relative;
           width: 100%;
-          max-width: 640px;
-          aspect-ratio: 4 / 3;
+          max-width: 720px;
+          aspect-ratio: 3 / 4;
           background: #000;
           border-radius: var(--radius-md);
           overflow: hidden;
+        }
+
+        @media (max-width: 768px) {
+          .viewfinder-wrapper {
+            max-width: 100%;
+            aspect-ratio: auto;
+            height: 70vh;
+            border-radius: 0;
+          }
+          .viewfinder-panel {
+            padding: 0 !important;
+            min-height: auto !important;
+          }
+        }
+
+        /* Fullscreen toggle button */
+        .btn-fullscreen-toggle {
+          position: absolute;
+          top: 10px;
+          right: 10px;
+          z-index: 26;
+          background: rgba(0, 0, 0, 0.7);
+          color: #fff;
+          border: 1px solid rgba(255,255,255,0.3);
+          padding: 0.4rem 0.8rem;
+          border-radius: var(--radius-full);
+          font-size: 0.75rem;
+          font-weight: 600;
+          cursor: pointer;
+          backdrop-filter: blur(6px);
+        }
+
+        /* FULLSCREEN CAMERA OVERLAY */
+        .fullscreen-camera-overlay {
+          position: fixed;
+          inset: 0;
+          z-index: 9999;
+          background: #000;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+        }
+
+        .fullscreen-video-feed {
+          width: 100%;
+          height: 100%;
+          object-fit: cover;
+        }
+
+        .fullscreen-guide-frame {
+          position: absolute;
+          inset: 5%;
+          border: 2px dashed rgba(59, 130, 246, 0.5);
+          border-radius: 8px;
+          pointer-events: none;
+        }
+
+        .fullscreen-top-bar {
+          position: absolute;
+          top: 0;
+          left: 0;
+          right: 0;
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          padding: 12px 16px;
+          background: linear-gradient(to bottom, rgba(0,0,0,0.7), transparent);
+          z-index: 10;
+        }
+
+        .btn-fullscreen-close {
+          background: rgba(239, 68, 68, 0.8);
+          color: #fff;
+          border: none;
+          padding: 0.5rem 1rem;
+          border-radius: var(--radius-full);
+          font-size: 0.85rem;
+          font-weight: 700;
+          cursor: pointer;
+          backdrop-filter: blur(6px);
+        }
+
+        .fullscreen-hint {
+          color: rgba(255,255,255,0.8);
+          font-size: 0.8rem;
+          font-weight: 500;
+        }
+
+        .fullscreen-bottom-bar {
+          position: absolute;
+          bottom: 0;
+          left: 0;
+          right: 0;
+          display: flex;
+          justify-content: center;
+          padding: 20px 16px 40px;
+          background: linear-gradient(to top, rgba(0,0,0,0.8), transparent);
+          z-index: 10;
+        }
+
+        .btn-fullscreen-capture {
+          background: linear-gradient(135deg, var(--accent-success), #059669);
+          color: #fff;
+          border: none;
+          padding: 1rem 2.5rem;
+          border-radius: var(--radius-full);
+          font-size: 1.15rem;
+          font-weight: 800;
+          cursor: pointer;
+          box-shadow: 0 8px 30px rgba(16, 185, 129, 0.5);
+          letter-spacing: 0.5px;
+          transition: transform 0.15s ease;
+        }
+
+        .btn-fullscreen-capture:active {
+          transform: scale(0.95);
         }
 
         .floating-scan-btn-box {
