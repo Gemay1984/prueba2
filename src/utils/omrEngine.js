@@ -39,13 +39,13 @@ const findCornerMarkers = (imgData, width, height) => {
             const idx = (py * width + px) * 4;
             const gray = 0.299 * data[idx] + 0.587 * data[idx + 1] + 0.114 * data[idx + 2];
 
-            if (gray < 90) darkCount++;
+            if (gray < 120) darkCount++;
             totalCount++;
           }
         }
 
         const density = darkCount / totalCount;
-        if (density > darkestDensity && density > 0.6) {
+        if (density > darkestDensity && density > 0.45) {
           darkestDensity = density;
           bestX = x + boxSize / 2;
           bestY = y + boxSize / 2;
@@ -53,7 +53,7 @@ const findCornerMarkers = (imgData, width, height) => {
       }
     }
 
-    return { x: bestX, y: bestY, found: darkestDensity > 0.6 };
+    return { x: bestX, y: bestY, found: darkestDensity > 0.45 };
   };
 
   const marginX = Math.floor(width * 0.45);
